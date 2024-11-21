@@ -1,0 +1,64 @@
+# Codes// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract PredictionGame {
+    address public owner;
+    uint256 public houseBalance;
+
+    event GamePlayed(address indexed player, uint256 amount, uint256 prediction, uint256 houseNumber);
+    event GameWon(address indexed player, uint256 amountWon);
+    event GameLost(address indexed player, uint256 amountLost);
+    event DepositedToHouse(uint256 amount);
+    event WithdrawnFromHouse(uint256 amount);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can call this function");
+        _;
+    }
+
+    function depositToHouse() public payable onlyOwner {
+        houseBalance += msg.value;
+        emit DepositedToHouse(msg.value);
+    }
+
+    function withdrawHouseFunds(uint256 amount) public onlyOwner {
+        require(amount <= houseBalance, "Not enough funds in the house");
+        houseBalance -= amount;
+        (bool success, ) = payable(owner).call{value: amount}("");
+        require(success, "Transfer failed.");
+        emit WithdrawnFromHouse(amount);
+    }
+
+    function generateRandomNumber() private view returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty, msg.sender))) % 10; // Insecure randomness
+    }
+
+    function play(uint256 userPrediction) public payable {
+        require(msg.value >= 0.0001 ether, "Must bet at least 0.0001 Ether");
+        require(userPrediction >= 0 && userPrediction <= 9, "Prediction must be between 0 and 9");
+        require(houseBalance >= msg.value * 110 / 100, "House doesn't have enough balance to cover potential winnings");
+
+        uint256 houseNumber = generateRandomNumber();
+        emit GamePlayed(msg.sender, msg.value, userPrediction, houseNumber);
+
+        if (userPrediction == houseNumber) {
+            uint256 winnings = msg.value * 110 / 100; // 10% profit
+            houseBalance -= winnings; // Deduct winnings from house
+            (bool success, ) = payable(msg.sender).call{value: winnings}("");
+            require(success, "Transfer failed.");
+            emit GameWon(msg.sender, winnings);
+        } else {
+            uint256 loss = msg.value; // Player loses their entire bet
+            houseBalance += loss; // Add loss to house balance
+            emit GameLost(msg.sender, loss);
+        }
+    }
+
+    receive() external payable {
+        houseBalance += msg.value;
+    }
+}
