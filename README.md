@@ -3,4 +3,4 @@ deploying on linea step by step:
 
 coppy the code from code folder and paste it 
 compile the code
-next
+next steps as base sepolia deployment,check it on my profile
